@@ -1,0 +1,54 @@
+name: Frontend CI/CD - Innovatech
+
+on:
+  push:
+    branches:
+      - deploy # Reacciona únicamente a la rama exigida por la pauta
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+
+      # IE1: Construcción limpia e inicio de sesión seguro
+      - name: Iniciar sesión en Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Construir y Subir Imagen Docker
+        uses: docker/build-push-action@v4
+        with:
+          context: ./FrontendInnovatech
+          file: ./FrontendInnovatech/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/frontend-innovatech:latest
+
+  deploy-to-ec2:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      # IE4 & IE5: Conexión SSH segura usando llaves privadas para actualizar contenedores en AWS
+      - name: Desplegar en Instancia AWS EC2 mediante SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.AWS_EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
+          script: |
+            # Descargar la última versión de la imagen
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/frontend-innovatech:latest
+            
+            # Detener y eliminar el contenedor viejo si existe
+            docker stop frontend-innovatech || true
+            docker rm frontend-innovatech || true
+            
+            # Levantar el nuevo contenedor en el puerto 8082 mapeado al 80 interno de Nginx
+            docker run -d \
+              --name frontend-innovatech \
+              -p 8082:80 \
+              --network innovatech-net \
+              ${{ secrets.DOCKERHUB_USERNAME }}/frontend-innovatech:latest
