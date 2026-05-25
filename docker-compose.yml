@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  # Interfaz Web de Innovatech
+  frontend-innovatech:
+    image: ${DOCKERHUB_USERNAME}/frontend-innovatech:latest
+    container_name: frontend-innovatech
+    restart: always
+    ports:
+      - "80:80"  # Expone la aplicación web directamente en el puerto 80 estándar
